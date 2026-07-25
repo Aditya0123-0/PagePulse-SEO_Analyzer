@@ -2,6 +2,7 @@ package com.pagepulse.service;
 
 import com.pagepulse.exception.InvalideUrlException;
 import com.pagepulse.exception.NoHtmlContentException;
+import org.jsoup.UnsupportedMimeTypeException;
 import com.pagepulse.model.AuditResponse;
 import com.pagepulse.util.HtmlParser;
 import org.jsoup.Connection;
@@ -17,6 +18,7 @@ import java.util.List;
 
 @Service
 public class AuditServiceImpl implements AuditService {
+
     private final HtmlParser htmlParser = new HtmlParser();
 
     @Override
@@ -27,30 +29,30 @@ public class AuditServiceImpl implements AuditService {
         try {
 
             long start = System.currentTimeMillis();
+
             Connection.Response response = Jsoup.connect(url)
-                    .timeout(5000)
-                    .followRedirects(true)
+                    .userAgent("Mozilla/5.0")
                     .ignoreHttpErrors(true)
                     .execute();
-
             int status = response.statusCode();
             String contentType = response.contentType();
 
-            if (contentType == null ||
-                    !contentType.toLowerCase().contains("text/html")) {
-
+            if (contentType == null || !contentType.toLowerCase().contains("text/html")) {
                 throw new NoHtmlContentException("URL does not return HTML content");
             }
 
             Document document = response.parse();
+
+            long responseTime = System.currentTimeMillis() - start;
+
             String title = htmlParser.getTitle(document);
             String metaDescription = htmlParser.getMetaDescription(document);
             int h1Count = htmlParser.getH1Count(document);
             int imagesMissingAlt = htmlParser.getImagesMissingAlt(document);
             int wordCount = htmlParser.getWordCount(document);
 
-            List<String> recommendations = new ArrayList<>();
             int seoScore = 100;
+            List<String> recommendations = new ArrayList<>();
 
             if (title.isBlank()) {
                 seoScore -= 20;
@@ -86,46 +88,43 @@ public class AuditServiceImpl implements AuditService {
                 recommendations.add("No major SEO issues detected.");
             }
 
-            long responseTime = System.currentTimeMillis() - start;
-
             return new AuditResponse(
                     url,
                     status,
                     responseTime,
-                    htmlParser.getTitle(document),
-                    htmlParser.getMetaDescription(document),
-                    htmlParser.getH1Count(document),
-                    htmlParser.getImagesMissingAlt(document),
-                    htmlParser.getWordCount(document),
+                    title,
+                    metaDescription,
+                    h1Count,
+                    imagesMissingAlt,
+                    wordCount,
                     seoScore,
                     recommendations
-
             );
 
-        } catch (MalformedURLException e) {
+        }catch (UnsupportedMimeTypeException e) {
+
+            throw new NoHtmlContentException("URL does not return HTML content");
+
+        }
+        catch (MalformedURLException e) {
 
             throw new InvalideUrlException("Invalid URL");
 
         } catch (IOException e) {
 
-            throw new RuntimeException("Unable to fetch webpage");
+            e.printStackTrace();
+
+            throw new RuntimeException("Unable to fetch webpage", e);
 
         }
-
     }
 
     private void validateUrl(String url) {
 
         try {
-
             new URL(url);
-
         } catch (Exception e) {
-
             throw new InvalideUrlException("Invalid URL");
-
         }
-
     }
-
 }

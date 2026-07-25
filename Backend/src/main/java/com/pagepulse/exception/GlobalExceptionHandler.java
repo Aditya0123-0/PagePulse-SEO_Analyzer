@@ -69,6 +69,8 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleGeneric(
             Exception ex) {
 
+        ex.printStackTrace();
+
         Map<String, String> error = new HashMap<>();
         error.put("error", "Internal Server Error");
 
